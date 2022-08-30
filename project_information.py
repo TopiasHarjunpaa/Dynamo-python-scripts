@@ -1,3 +1,4 @@
+from datetime import date
 from RevitServices.Persistence import DocumentManager 
 from Autodesk.Revit.DB import FilteredElementCollector, BuiltInCategory
 
@@ -14,5 +15,6 @@ client_name = result[13]
 address = result[14]
 project_name = result[15]
 supervisor = result[24]
+datetime = ["Date", date.today()]
 
-OUT = [author, client_name, address, project_name, supervisor]
+OUT = [author, client_name, address, project_name, supervisor, datetime]
