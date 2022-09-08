@@ -1,6 +1,4 @@
 from datetime import date
-from email import header
-from operator import le
 from RevitServices.Persistence import DocumentManager as dm
 from Autodesk.Revit.DB import FilteredElementCollector, BuiltInCategory
 
