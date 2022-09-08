@@ -20,8 +20,8 @@ def combine_lists(project_list, master_list, info):
 
 	for product in project_list[1:]:
 		count = product[0]
-		name_fin = product[1]
-		product_number = product[2]
+		product_number = product[1]
+		name_fin = product[2]
 		name_eng = product[3]
 		name_swe = product[4]
 		weight = float(product[5])
