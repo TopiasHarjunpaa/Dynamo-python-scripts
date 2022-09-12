@@ -1,5 +1,10 @@
 import math
 import copy
+from itertools import compress
+import clr
+clr.AddReference('RevitAPIUI')
+
+from Autodesk.Revit.UI import TaskDialog
 
 class BaySetup:
     def __init__(self, count=0):
@@ -30,7 +35,7 @@ class BaySetup:
     
     def __str__(self):
         total_dist = self.check_sum()
-        return f"count: {self.bay_count} - distance: {total_dist}"
+        return f"Number of bays: {self.bay_count} - exact distance: {total_dist}"
 
 def find_least_bays(distance, tolerance, bay_lengths):
     result = [BaySetup() for i in range(distance + tolerance + 1)]
@@ -79,14 +84,28 @@ def compact_bays(list_of_bays, bay_lengths):
     
     return compacted_list
 
-bay_lengths = [154, 390, 450, 732, 1088, 1400, 1572, 2072, 2572]
-tolerance = 125
-distance = 100000
+bay_filters = IN[0]
+bay_lengths = [154, 390, 450, 732, 1088, 1400, 1572, 2072, 2572, 3072]
+filtered_bays = list(compress(bay_lengths, bay_filters))
+distance = IN[1]
+tolerance = IN[2]
 
+response_text = f"Targeted distance: {distance}\n\n"
 
-print(f"Targeted distance: {distance}")
-results = find_least_bays(distance, tolerance, bay_lengths)
-for result in results:
-    info = ', '.join(compact_bays(result.get_bays(), bay_lengths))
-    print(result)
-    print(info)
+results = find_least_bays(distance, tolerance, filtered_bays)
+
+if len(results) == 0:
+    response_text += "No bay combinations available with current input"
+    TaskDialog.Show("Dynamo Player", response_text)
+
+else:
+    counter = 1
+    for result in results:
+        info = ', '.join(compact_bays(result.get_bays(), filtered_bays))
+        response_text += f"Solution number {counter}: {result} \n"
+        response_text += f"Bay combination: {info} \n\n"
+        counter += 1
+
+    TaskDialog.Show("Dynamo Player", response_text)
+
+OUT = "Success!"
