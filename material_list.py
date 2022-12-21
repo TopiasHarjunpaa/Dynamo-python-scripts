@@ -12,6 +12,27 @@ def create_project_info_and_headers(info, sums):
 
 	return info_list
 
+def get_tarpaulin_parameters(length, width):
+	tarpaulin_length = int(length)/1000
+	tarpaulin_width = float(width)/1000
+	if tarpaulin_length % 2 != 0:
+		tarpaulin_length += 1
+	tarpaulin_area = tarpaulin_length * tarpaulin_width
+	return tarpaulin_length, tarpaulin_width, tarpaulin_area
+
+def format_tarpaulin_product_number(product_number, length, width):
+	formated_product_number = f"{product_number}{int(length)}"
+	if width != 2.572:
+		formated_product_number += f"-{width:.2f}"
+	return formated_product_number.replace(".","")
+
+def format_tarpaulin_names(fin, eng, swe, length, width):
+	suffix = f" {width:.2f} x {length:.2f} m".replace(".", ",")
+	fin += suffix
+	eng += suffix.replace("m", "M")
+	swe += suffix
+	return fin, eng, swe
+
 def combine_lists(project_list, master_list, info):
 	combined_list = []
 	key_order = info[2]
@@ -28,17 +49,32 @@ def combine_lists(project_list, master_list, info):
 		total_weight += weight * int(count)
 		found = False
 
-		for master_product in master_list[1:]:
-			m_product_number = master_product[0]
-			m_price = float(master_product[5])
+		if product_number == "KHKATT" and len(product) >= 8:
+			tarpaulin_length, tarpaulin_width, tarpaulin_area = get_tarpaulin_parameters(product[6], product[7])
+			edited_product_number = format_tarpaulin_product_number(product_number, tarpaulin_length, tarpaulin_width)
+			edited_name_fin, edited_name_eng, edited_name_swe = format_tarpaulin_names(name_fin, name_eng, name_swe, tarpaulin_length, tarpaulin_width)
+			
+			weight = round(tarpaulin_area * 0.67, 1)
+			price = round(tarpaulin_area * 12.7, 2)
+			total_weight += weight * int(count)
+			total_price += price * int(count)
 
-			if product_number == m_product_number:
-				row = [count, product_number, weight, m_price, name_fin, name_eng, name_swe]
-				sorted_row = sort_rows(key_order, row)
-				combined_list.append(sorted_row)
-				total_price += m_price * int(count)
-				found = True
-				break
+			row = [count, edited_product_number, weight, price, edited_name_fin, edited_name_eng, edited_name_swe]
+			sorted_row = sort_rows(key_order, row)
+			combined_list.append(sorted_row)
+			found = True
+		else:
+			for master_product in master_list[1:]:
+				m_product_number = master_product[0]
+				m_price = float(master_product[5])
+
+				if product_number == m_product_number:
+					row = [count, product_number, weight, m_price, name_fin, name_eng, name_swe]
+					sorted_row = sort_rows(key_order, row)
+					combined_list.append(sorted_row)
+					total_price += m_price * int(count)
+					found = True
+					break
 
 		if not found:
 			row = [count, product_number, weight, '0', name_fin, name_eng, name_swe]
