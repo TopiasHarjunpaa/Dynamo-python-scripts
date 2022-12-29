@@ -147,6 +147,7 @@ return_period = IN[4]
 monopitch = IN[5]
 roof_width = IN[6]
 
+# Need to add additional inputs to check if uses finnish NA and for wind zones
 wind_calculation_params = calculate_peak_velocity_pressure(True, terrain_category, return_period, height, 21)
 peak_velocity_pressure = wind_calculation_params[8]
 pressure_coefficients = calculate_pressure_coefficents(angle, roof_width, monopitch)
