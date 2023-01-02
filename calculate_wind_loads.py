@@ -25,6 +25,8 @@ def calculate_propability_factor(return_period: int, shape_parameter: float=0.2,
         n is exponent
         p is probability for an annual exceedence
 
+        NOTE: Return period has been limited to min 2 years, due value 1 or less will lead into error -> ln(0)
+
     Args:
         return_period (int): Return period in years to calculate probability for an annual exceedence.
         shape_parameter (float, optional): Parameter depending on the coefficient of variation of the extreme-value distribution. Defaults to 0.2.
@@ -34,7 +36,7 @@ def calculate_propability_factor(return_period: int, shape_parameter: float=0.2,
         float: Probability factor to modify fundamental basic wind velocity
     """
 
-    divident = 1 - shape_parameter * math.log(-1 * math.log(1 - 1 / return_period))
+    divident = 1 - shape_parameter * math.log(-1 * math.log(1 - 1 / max(return_period, 2)))
     divider = 1 - shape_parameter * math.log(-1 * math.log(0.98))
     cprop = (divident / divider) ** cprop_exponent
     
@@ -143,6 +145,7 @@ def calculate_peak_velocity_pressure(
         basic_wind_velocity,
         mean_wind_velocity,
         roughness_factor,
+        fin,
         wind_turbulence,
         orography_factor,
         turbulence_factor,
@@ -226,14 +229,16 @@ def add_wind_calculation_information(params: tuple) -> str:
 
     wind_calculation_info_header = "Wind calculation parameters\n"
     terrain_category = f"Terrain category: {TERRAIN_CATEGORY_ROME[params[0]]}\n"
-    wind_modifiers = f"Wind modifiers: cdir = {params[1]} | cseason = {params[2]} | cprop = {params[3]:.2f} (cprop2 = {params[3] ** 2:.2f})\n"
+    wind_modifiers = f"Basic wind velocity modifiers: cdir = {params[1]:.1f} | cseason = {params[2]:.1f} | cprop = {params[3]:.2f}\n"
     fundamental_basic_wind_velocity = f"Fundamental basic wind velocity: {params[4]:.1f} m/s\n"
     basic_wind_velocity = f"Basic wind velocity: {params[5]:.1f} m/s\n"
     mean_wind_velocity = f"Mean wind velocity: {params[6]:.1f} m/s\n"
     terrain_factor = f"Terrain roughness factor: {params[7]:.2f}\n"
-    wind_turbulence =f"Wind turbulence intensity: {params[8]:.2f} (c0 = {params[9]} | kl = {params[10]})\n"
-    air_pressure = f"Air pressure: {params[11]:.2f} kg/m2\n"
-    peak_velocity_pressure = f"Peak wind velocity pressure: {params[12]:.2f} kN/m2 ({params[13]:.1f} m/s peak wind speed)\n"
+    if(params[8] and params[0] == 0):
+        terrain_factor += f"Note: Terrain factor {TERRAIN_FACTOR_FIN} used in accordance to Finnish NA in terrain category 0\n"
+    wind_turbulence =f"Wind turbulence intensity: {params[9]:.2f} (c0 = {params[10]:.1f} | kl = {params[11]:.1f})\n"
+    air_pressure = f"Air pressure: {params[12]:.2f} kg/m2\n"
+    peak_velocity_pressure = f"Peak wind velocity pressure: {params[13]:.2f} kN/m2 ({params[14]:.1f} m/s peak wind speed)\n"
     wind_calculation_info_params = (
         terrain_category +
         wind_modifiers +
@@ -272,18 +277,51 @@ def add_pressure_coefficient_information(pressure_coefficients: dict, bay_length
         pressure_coefficient_info_params += f"{key}: {value:.2f} | {value * line_load:.2f} kN/m\n"
     return pressure_coefficient_info_header + pressure_coefficient_info_params
 
-# Input parameters recieved from the Revit / Dynamo user.
-terrain_category = IN[0]
-angle = IN[1]
-bay_length = IN[2]
-height = IN[3]
-return_period = IN[4]
-monopitch = IN[5]
-roof_width = IN[6]
+def add_nominal_duration_information(return_period: float) -> str:
+    nominal_duration_info_header = "Nominal length of the structure:\n"
+    cprop = calculate_propability_factor(return_period)
+    cprop2 = cprop ** 2
+    return_period_info = f"Return period used in calculation: {return_period} years\n"
+    cprop_info = f"Corresponds probability factor cprop = {cprop:.2f} and cprop2 = {cprop2:.2f}\n"
+    if (cprop2 < 0.7):
+        cprop_info += "Note: According to EN 12811-1 cprop2 shall be not less than 0.70\n"
+    nominal_duration_info = "Corresponds nominal duration of "
+    
+    if (return_period < 2):
+        nominal_duration_info += "0 days.\n"
+    if (2 <= return_period < 5):
+        nominal_duration_info += "less than 3 days (minimum period 2 years)\n"
+    if (5 <= return_period < 10):
+        nominal_duration_info += "less than 3 months (minimum period 5 years)\n"
+    if (10 <= return_period < 50):
+        nominal_duration_info += "less than 1 year (minimum period 10 years)\n"
+    if (return_period >= 50):
+        nominal_duration_info += "greater than 1 year (minimum period 50 year)\n"
 
-# Need to add additional inputs to check if uses finnish NA and for wind zones
-wind_calculation_params = calculate_peak_velocity_pressure(True, terrain_category, return_period, height, 21)
-peak_velocity_pressure = wind_calculation_params[12]
+    return nominal_duration_info_header + return_period_info + cprop_info + nominal_duration_info
+
+# Input parameters recieved from the Revit / Dynamo user.
+finnish_na = IN[0]
+fundamental_basic_wind_velocity = IN[1]
+terrain_category = IN[2]
+return_period = max(IN[3], 2)
+seasonal_factor = IN[4]
+orography_factor = IN[5]
+height = IN[6]
+roof_width = IN[7]
+bay_length = IN[8]
+angle = IN[9]
+monopitch = IN[10]
+
+wind_calculation_params = calculate_peak_velocity_pressure(
+    finnish_na,
+    terrain_category,
+    return_period, height,
+    fundamental_basic_wind_velocity,
+    seasonal_factor,
+    orography_factor
+)
+peak_velocity_pressure = wind_calculation_params[13]
 pressure_coefficients = calculate_pressure_coefficents(angle, roof_width, monopitch)
 
 response_text = add_basic_information(angle, bay_length, monopitch, roof_width)
@@ -291,7 +329,9 @@ response_text += "\n\n"
 response_text += add_wind_calculation_information(wind_calculation_params)
 response_text += "\n"
 response_text += add_pressure_coefficient_information(pressure_coefficients, bay_length, peak_velocity_pressure)
+response_text += "\n"
+response_text += add_nominal_duration_information(return_period)
 
-TaskDialog.Show("Dynamo Player", response_text)
+TaskDialog.Show("Wind calculation results", response_text)
 
 OUT = "Success"
