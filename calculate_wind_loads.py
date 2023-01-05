@@ -13,13 +13,13 @@ Z_ZERO = [0.003, 0.01, 0.05, 0.3, 1] # List of roughness lengths z0 depended fro
 Z_MIN = [1, 1, 2, 5, 10] # List of zmin's depended from TC
 TERRAIN_FACTOR_FIN = 0.18
 
-def calculate_propability_factor(return_period: int, shape_parameter: float=0.2, cprop_exponent: float=0.5) -> float:
+def calculate_propability_factor(return_period: int, shape_parameter: float=0.2, cprob_exponent: float=0.5) -> float:
     """Probability factor is used to modify fundamental basic wind velocity vb which has mean return period
         of 50 years. The 10 minutes mean wind velocity having the probability p for an annual exceedence is determined
         by multiplying the fundamental basic wind velocity vb by the probability factor, cprob.
         It is calculated using the following expression given at EN 1911-1-4 (expression 4.2):
 
-        Cprop = (1 - K ⋅ ln(-ln(1 - p)) / 1 - K ⋅ ln(-ln(0.98)))^n  where:
+        cprob = (1 - K ⋅ ln(-ln(1 - p)) / 1 - K ⋅ ln(-ln(0.98)))^n  where:
 
         K is the shape parameter
         n is exponent
@@ -30,7 +30,7 @@ def calculate_propability_factor(return_period: int, shape_parameter: float=0.2,
     Args:
         return_period (int): Return period in years to calculate probability for an annual exceedence.
         shape_parameter (float, optional): Parameter depending on the coefficient of variation of the extreme-value distribution. Defaults to 0.2.
-        cprop_exponent (float, optional): Exponent of the expression. Defaults to 0.5.
+        cprob_exponent (float, optional): Exponent of the expression. Defaults to 0.5.
 
     Returns:
         float: Probability factor to modify fundamental basic wind velocity
@@ -38,9 +38,9 @@ def calculate_propability_factor(return_period: int, shape_parameter: float=0.2,
 
     divident = 1 - shape_parameter * math.log(-1 * math.log(1 - 1 / max(return_period, 2)))
     divider = 1 - shape_parameter * math.log(-1 * math.log(0.98))
-    cprop = (divident / divider) ** cprop_exponent
+    cprob = (divident / divider) ** cprob_exponent
     
-    return cprop
+    return cprob
 
 def calculate_terrain_factor(fin: bool, terrain_category: int) -> float:
     """Terrain factor is calculated using formula kr = 0.19 ⋅ (z0 / z0,II) ^ 0.07
@@ -98,12 +98,12 @@ def calculate_peak_velocity_pressure(
     air_density: float=1.25,
     directional_factor: float=1.0,
     turbulence_factor: float=1.0
-) -> tuple:
+) -> list:
     """Calculate peak wind velocity pressure according to EN 1991-1-4.
         Process involves following steps:
 
         1. Calculate probability factor
-        2. Modify fundamental basic wind velocity: vb = cdir · cseason · vb,0 · cprop
+        2. Modify fundamental basic wind velocity: vb = cdir · cseason · vb,0 · cprob
         3. Calculate terrain factor: kr = 0.19 ⋅ (z0 / z0,II)^0.07
         4. Calculate roughness factor: cr(ze) = kr ⋅ ln(max{ze, zmin} / z0)
         5. Calculate mean wind velocity: vm(ze) = cr(ze) ⋅ c0(ze) ⋅ vb
@@ -123,12 +123,12 @@ def calculate_peak_velocity_pressure(
         turbulence_factor (float, optional): The value of the turbulence factor. May be given in the NA. Defaults to 1.0.
 
     Returns:
-        tuple: Returns bunch of parameters and calculation results from various expression.
+        list: Returns bunch of parameters and calculation results from various expression.
     """
 
     wind_height = max(min(200, height), Z_MIN[terrain_category])
-    cprop = calculate_propability_factor(return_period)
-    basic_wind_velocity = fundamental_basic_wind_velocity * cprop * seasonal_factor * directional_factor
+    cprob = calculate_propability_factor(return_period)
+    basic_wind_velocity = fundamental_basic_wind_velocity * cprob * seasonal_factor * directional_factor
     terrain_factor = calculate_terrain_factor(fin, terrain_category)
     roughness_factor = terrain_factor * math.log(wind_height / Z_ZERO[terrain_category])
     mean_wind_velocity = roughness_factor * orography_factor * basic_wind_velocity
@@ -136,11 +136,11 @@ def calculate_peak_velocity_pressure(
     peak_velocity_pressure = (1 + 7 * wind_turbulence) * 1/2000 * air_density * mean_wind_velocity ** 2
     peak_wind_speed = convert_pressure_to_speed(peak_velocity_pressure, air_density)
 
-    return (
+    return [
         terrain_category,
         directional_factor,
         seasonal_factor,
-        cprop,
+        cprob,
         fundamental_basic_wind_velocity,
         basic_wind_velocity,
         mean_wind_velocity,
@@ -152,7 +152,7 @@ def calculate_peak_velocity_pressure(
         air_density,
         peak_velocity_pressure,
         peak_wind_speed
-    )
+    ]
 
 def calculate_roof_suction(angle: int, width: int) -> float:
     """Calculate external roof suction pressure coefficient according to EN 16508
@@ -173,14 +173,14 @@ def calculate_roof_suction(angle: int, width: int) -> float:
         return 0.01 * width - 0.8 * angle_factor
     return -0.55 + angle_factor
 
-def calculate_pressure_coefficents(angle: int, width: int, monopitch: bool) -> dict:
-    """Calculatepressure coefficients for weather protection according to EN 16508
-        using roof angle and roof width and roof type (duopitch or monopitch roof).
+def calculate_pressure_coefficents(angle: int, width: int) -> dict:
+    """Calculate pressure coefficients for weather protection according to EN 16508
+        using roof angle and roof width. Sets roof pressure coefficients to zero if roof width
+        has set to zero.
 
     Args:
         angle (int): Roof angle in degrees.
         width (int): Roof width in millimeters.
-        monopitch (bool): Boolen value to determine whether roof type is monopitch (true) or duopitch (false).
 
     Returns:
         dict: Pressure coefficients in dictionary format. Key = name of the pressure surface. Value = coefficient.
@@ -190,11 +190,14 @@ def calculate_pressure_coefficents(angle: int, width: int, monopitch: bool) -> d
     coefficients["Wall pressure"] = WALL_PRESSURE
     coefficients["Wall suction"] = WALL_SUCTION
     coefficients["Roof pressure"] = min(max(0.03 * angle - 0.25, 0), 0.7)
-    if monopitch:
-        coefficients["Roof suction to up slope"] = MONOPITCH_SUCTION_US
-        coefficients["Roof suction to down slope"] = MONOPITCH_SUCTION_DS
-    else:
-        coefficients["Roof suction"] = calculate_roof_suction(angle, width)
+    coefficients["Double-pitch roof suction"] = calculate_roof_suction(angle, width)
+    coefficients["Mono-pitch roof suction to up slope"] = MONOPITCH_SUCTION_US
+    coefficients["Mono-pitch roof suction to down slope"] = MONOPITCH_SUCTION_DS
+    if roof_width == 0:
+        coefficients["Roof pressure"] = 0
+        coefficients["Double-pitch roof suction"] = 0
+        coefficients["Mono-pitch roof suction to up slope"] = 0
+        coefficients["Mono-pitch roof suction to down slope"] = 0      
     return coefficients
 
 def add_basic_information(angle: int, bay_length: int, monopitch: bool, roof_width: int) -> str:
@@ -229,7 +232,7 @@ def add_wind_calculation_information(params: tuple) -> str:
 
     wind_calculation_info_header = "Wind calculation parameters\n"
     terrain_category = f"Terrain category: {TERRAIN_CATEGORY_ROME[params[0]]}\n"
-    wind_modifiers = f"Basic wind velocity modifiers: cdir = {params[1]:.1f} | cseason = {params[2]:.1f} | cprop = {params[3]:.2f}\n"
+    wind_modifiers = f"Basic wind velocity modifiers: cdir = {params[1]:.1f} | cseason = {params[2]:.1f} | cprob = {params[3]:.2f}\n"
     fundamental_basic_wind_velocity = f"Fundamental basic wind velocity: {params[4]:.1f} m/s\n"
     basic_wind_velocity = f"Basic wind velocity: {params[5]:.1f} m/s\n"
     mean_wind_velocity = f"Mean wind velocity: {params[6]:.1f} m/s\n"
@@ -253,7 +256,7 @@ def add_wind_calculation_information(params: tuple) -> str:
     )
     return wind_calculation_info_header + wind_calculation_info_params
 
-def add_pressure_coefficient_information(pressure_coefficients: dict, bay_length: int, peak_velocity_pressure: float) -> str:
+def add_pressure_coefficient_information(pressure_coefficients: dict, bay_length: int, peak_velocity_pressure: float, monopitch: bool) -> str:
     """Format arguments and create multiline string of the pressure coefficient information.
         Pressure coefficients are in dictionary format. In text formating process, each surface type:
 
@@ -272,19 +275,26 @@ def add_pressure_coefficient_information(pressure_coefficients: dict, bay_length
 
     pressure_coefficient_info_header = "Pressure coefficients:\n"
     pressure_coefficient_info_params = ""
+    filtered_coefficients = pressure_coefficients.copy()
+    if (monopitch):
+        filtered_coefficients.pop("Double-pitch roof suction")
+    else:
+        filtered_coefficients.pop("Mono-pitch roof suction to up slope")
+        filtered_coefficients.pop("Mono-pitch roof suction to down slope")
+
     line_load = (bay_length / 1000) * peak_velocity_pressure
-    for key, value in pressure_coefficients.items():
+    for key, value in filtered_coefficients.items():
         pressure_coefficient_info_params += f"{key}: {value:.2f} | {value * line_load:.2f} kN/m\n"
     return pressure_coefficient_info_header + pressure_coefficient_info_params
 
 def add_nominal_duration_information(return_period: float) -> str:
     nominal_duration_info_header = "Nominal length of the structure:\n"
-    cprop = calculate_propability_factor(return_period)
-    cprop2 = cprop ** 2
+    cprob = calculate_propability_factor(return_period)
+    cprob2 = cprob ** 2
     return_period_info = f"Return period used in calculation: {return_period} years\n"
-    cprop_info = f"Corresponds probability factor cprop = {cprop:.2f} and cprop2 = {cprop2:.2f}\n"
-    if (cprop2 < 0.7):
-        cprop_info += "Note: According to EN 12811-1 cprop2 shall be not less than 0.70\n"
+    cprob_info = f"Corresponds probability factor cprob = {cprob:.2f} and cprob2 = {cprob2:.2f}\n"
+    if (cprob2 < 0.7):
+        cprob_info += "Note: According to EN 12811-1 cprob2 shall be not less than 0.70\n"
     nominal_duration_info = "Corresponds nominal duration of "
     
     if (return_period < 2):
@@ -298,20 +308,102 @@ def add_nominal_duration_information(return_period: float) -> str:
     if (return_period >= 50):
         nominal_duration_info += "greater than 1 year (minimum period 50 year)\n"
 
-    return nominal_duration_info_header + return_period_info + cprop_info + nominal_duration_info
+    return nominal_duration_info_header + return_period_info + cprob_info + nominal_duration_info
+
+def format_imposed_loads(imposed_load: float) -> dict:
+    combination_factor = "1,00"
+    if imposed_load <= 75:
+        combination_factor = "0,00"
+    if 75 < imposed_load <= 200:
+        combination_factor = "0,25"
+    if 200 < imposed_load <= 600:
+        combination_factor = "0,50"
+    return {"Imposed loads": f"{imposed_load/100:.2f}".replace(".", ","), "Imposed load combination factor": combination_factor}
+
+def format_consequence_class(consequence_class: int) -> dict:
+    k_factor = "1,00"
+    if (consequence_class == 1):
+        k_factor = "0,90"
+    if (consequence_class == 3):
+        k_factor = "1,10"
+    return {"Consequence class": f"CC{consequence_class}", "K factor": k_factor}
+
+def format_input(wind_calculation_params: list,
+    pressure_coefficients: dict,
+    angle: int,
+    bay_length: int,
+    roof_width: int,
+    return_period: float,
+    height: float,
+    imposed_load: float,
+    consequence_class: int,
+    snow_load: float
+) -> list:
+    name_list = [
+        "Terrain category",
+        "Directional factor",
+        "Seasonal factor",
+        "Probability factor",
+        "Fundamental basic wind velocity",
+        "Basic wind velocity",
+        "Mean wind velocity",
+        "Roughness factor",
+        "Wind turbulence intensity",
+        "Orography factor",
+        "Turbulence factor",
+        "Air density",
+        "Peak velocity pressure",
+        "Peak wind speed",
+        "Roof angle",
+        "Bay length",
+        "Roof width",
+        "Return period",
+        "Height above ground",
+        "Snow load"
+        ]
+    value_list = [f"{value:.2f}".replace(".", ",") for value in wind_calculation_params[:8] + wind_calculation_params[9:]]
+    value_list[0] = TERRAIN_CATEGORY_ROME[wind_calculation_params[0]]
+    value_list += [
+        f"{angle:.2f}".replace(".", ","),
+        f"{bay_length / 1000:.2f}".replace(".", ","),
+        f"{roof_width / 1000:.2f}".replace(".", ","),
+        f"{return_period:.0f}",
+        f"{height:.0f}".replace(".", ","),
+        f"{snow_load/100:.2f}".replace(".", ",")
+    ]
+    peak_velocity_pressure = wind_calculation_params[13]
+    line_load = peak_velocity_pressure * bay_length / 1000
+    for key, value in pressure_coefficients.items():
+        name_list.append(key)
+        name_list.append(f"{key} load")
+        value_list.append(f"{value:.2f}".replace(".", ","))
+        value_list.append(f"{value * line_load:.2f}".replace(".", ","))
+    for key, value in format_imposed_loads(imposed_load).items():
+        name_list.append(key)
+        value_list.append(value)
+    for key, value in format_consequence_class(consequence_class).items():
+        name_list.append(key)
+        value_list.append(value)
+    return [name_list, value_list]
 
 # Input parameters recieved from the Revit / Dynamo user.
-finnish_na = IN[0]
-fundamental_basic_wind_velocity = IN[1]
-terrain_category = IN[2]
-return_period = max(IN[3], 2)
+finnish_na = IN[0] # boolen
+fundamental_basic_wind_velocity = IN[1] #in meters per second
+terrain_category = IN[2] #int value 0-4
+return_period = max(IN[3], 2) # in years. Min 2 years.
 seasonal_factor = IN[4]
 orography_factor = IN[5]
-height = IN[6]
-roof_width = IN[7]
-bay_length = IN[8]
-angle = IN[9]
-monopitch = IN[10]
+height = IN[6] # in meters
+roof_width = IN[7] # in millimeters
+bay_length = IN[8] # in millimeters
+angle = IN[9] # in degrees
+monopitch = IN[10] # boolean
+imposed_load = IN[11] #in kilograms
+snow_load = IN[12] #in kilograms
+consequence_class = IN[13] #int value 1-3
+
+if roof_width == 0:
+    angle = 0
 
 wind_calculation_params = calculate_peak_velocity_pressure(
     finnish_na,
@@ -322,16 +414,27 @@ wind_calculation_params = calculate_peak_velocity_pressure(
     orography_factor
 )
 peak_velocity_pressure = wind_calculation_params[13]
-pressure_coefficients = calculate_pressure_coefficents(angle, roof_width, monopitch)
+pressure_coefficients = calculate_pressure_coefficents(angle, roof_width)
 
 response_text = add_basic_information(angle, bay_length, monopitch, roof_width)
 response_text += "\n\n"
 response_text += add_wind_calculation_information(wind_calculation_params)
 response_text += "\n"
-response_text += add_pressure_coefficient_information(pressure_coefficients, bay_length, peak_velocity_pressure)
+response_text += add_pressure_coefficient_information(pressure_coefficients, bay_length, peak_velocity_pressure, monopitch)
 response_text += "\n"
 response_text += add_nominal_duration_information(return_period)
 
 TaskDialog.Show("Wind calculation results", response_text)
 
-OUT = "Success"
+OUT = format_input(
+    wind_calculation_params,
+    pressure_coefficients,
+    angle,
+    bay_length,
+    roof_width,
+    return_period,
+    height,
+    imposed_load,
+    consequence_class,
+    snow_load
+)
