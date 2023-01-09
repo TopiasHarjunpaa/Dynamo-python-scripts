@@ -88,7 +88,7 @@ def filter_project_info(project_params):
     client_name = result[13]
     address = result[14]
     project_name = result[15]
-    supervisor = result[24]
+    supervisor = result[22]
     datetime = ["Date", date.today()]
 
     return [author, client_name, address, project_name, supervisor, datetime]
