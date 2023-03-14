@@ -89,6 +89,11 @@ def filter_project_info(project_params):
     address = result[14]
     project_name = result[15]
     supervisor = result[22]
+
+    # This is just to prevent getting erros with old Revit template due different param order.
+    if supervisor[0] != "Supervisor name":
+        supervisor = result[24]
+
     datetime = ["Date", date.today()]
 
     return [author, client_name, address, project_name, supervisor, datetime]
