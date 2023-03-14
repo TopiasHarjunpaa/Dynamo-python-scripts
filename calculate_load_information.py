@@ -170,7 +170,7 @@ def calculate_roof_suction(angle: int, width: int) -> float:
     if width <= 10000:
         return -0.7 + angle_factor
     elif width < 25000:
-        return 0.01 * width - 0.8 * angle_factor
+        return 0.01 * width / 1000 - 0.8 + angle_factor
     return -0.55 + angle_factor
 
 def calculate_pressure_coefficents(angle: int, width: int) -> dict:
@@ -288,6 +288,17 @@ def add_pressure_coefficient_information(pressure_coefficients: dict, bay_length
     return pressure_coefficient_info_header + pressure_coefficient_info_params
 
 def add_nominal_duration_information(return_period: float) -> str:
+    """Calculates probability factor using value of the return period and formats response with
+        with additional information according to EN 1991-1-6 ie. what is the maximum nominal duration
+        with certain return period.
+
+    Args:
+        return_period (float): Return period in years
+
+    Returns:
+        str: Multiline string of the nominal duration information.
+    """
+
     nominal_duration_info_header = "Nominal length of the structure:\n"
     cprob = calculate_propability_factor(return_period)
     cprob2 = cprob ** 2
@@ -311,6 +322,15 @@ def add_nominal_duration_information(return_period: float) -> str:
     return nominal_duration_info_header + return_period_info + cprob_info + nominal_duration_info
 
 def format_imposed_loads(imposed_load: float) -> dict:
+    """Formats response according to imposed load value. Includes imposed load
+        and combination factor based on EN 12811-1. Converts imposed load value from kilograms to kilonewtons.
+
+    Args:
+        imposed_load (float): Imposed load in kilograms.
+
+    Returns:
+        dict: Multiline string of the imposed load information.
+    """
     combination_factor = "1,00"
     if imposed_load <= 75:
         combination_factor = "0,00"
@@ -321,6 +341,16 @@ def format_imposed_loads(imposed_load: float) -> dict:
     return {"Imposed loads": f"{imposed_load/100:.2f}".replace(".", ","), "Imposed load combination factor": combination_factor}
 
 def format_consequence_class(consequence_class: int) -> dict:
+    """Calculates K factor according to consequence class based on EN 1990 and creates response
+        in dictionary format.
+
+    Args:
+        consequence_class (int): _description_
+
+    Returns:
+        dict: Dictionary where key is formatted consequence class and value is K factor.
+    """
+
     k_factor = "1,00"
     if (consequence_class == 1):
         k_factor = "0,90"
@@ -339,6 +369,12 @@ def format_input(wind_calculation_params: list,
     consequence_class: int,
     snow_load: float
 ) -> list:
+    """Formats input with calculate parameters. These will be used as Revit parameters.
+
+    Returns:
+        list: List containing list with parameters names and other list with parameter values.
+    """
+
     name_list = [
         "Terrain category",
         "Directional factor",
