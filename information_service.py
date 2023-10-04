@@ -36,13 +36,13 @@ ENG = {"Author": "Designer",
         }
 
 # Needs to be properly translated later
-SWE = {"Author": "Designer",
-        "Client Name": "Klient namn",
+SWE = {"Author": "Projektingenjör",
+        "Client Name": "Kund/Beställare",
         "Project Address": "Projekt address",
-        "Project Name": "Project namn",
-        "Supervisor name": "Handledarens namn",
+        "Project Name": "Projektets namn",
+        "Supervisor name": "Projektansvarig, Telinekataja Group",
         "Date": "Datum",
-        "Count": "Räkna",
+        "Count": "Antal",
         "Product number": "Produktnummer",
         "Product names": {1: "Productnamn FIN", 2: "Productnamn ENG", 3: "Productnamn SWE"},
         "Weight": "Vikt",
