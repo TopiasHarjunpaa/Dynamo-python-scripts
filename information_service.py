@@ -16,7 +16,9 @@ FIN = {"Author": "Suunnittelija",
         "List price": "Listahinta",
         "Material list": "Kalustolista",
         "Total weight": "Kokonaispaino",
-        "Total price": "Kokonaishinta"
+        "Total price": "Kokonaishinta",
+        "Suspended_note": "Huomioitavaa",
+        "Anchor_note": "Ankkurointiin käytettävät juoksut (kalustolista sisältää juoksujen kokonaismäärät)"
         }
 
 ENG = {"Author": "Designer",
@@ -32,10 +34,11 @@ ENG = {"Author": "Designer",
         "List price": "List price",
         "Material list": "Material list",
         "Total weight": "Total weight",
-        "Total price": "Total price"
+        "Total price": "Total price",
+        "Suspended_note": "Additional notes",
+        "Anchor_note": "O-ledgers needed for anchoring (material list contains total numbers of O-ledgers)"
         }
 
-# Needs to be properly translated later
 SWE = {"Author": "Projektingenjör",
         "Client Name": "Kund/Beställare",
         "Project Address": "Projekt address",
@@ -49,7 +52,9 @@ SWE = {"Author": "Projektingenjör",
         "List price": "Listpris €",
         "Material list": "Produktlista",
         "Total weight": "Totalvikt",
-        "Total price": "Totalpris"
+        "Total price": "Totalpris",
+        "Suspended_note": "Ytterligare anmärkningar",
+        "Anchor_note": "Horisontalstag som behövs för förankring (materiallistan innehåller totalt antal horisontalstag)"
         }
 
 LANGUAGES =[FIN, ENG, SWE]
@@ -76,6 +81,8 @@ def convert_language(filtered_project_params, main_language):
     output.append(["Total weight", main_language["Total weight"]])
     output.append(["Total price", main_language["Total price"]])
     output.append(["Material list", main_language["Material list"]])
+    output.append(["Suspended_note", main_language["Suspended_note"]])
+    output.append(["Anchor_note", main_language["Anchor_note"]])
 
     return output
 
@@ -105,7 +112,7 @@ def get_headers(ml):
     main_product_name = ml["Product names"][0]
     weight = ml["Weight"]
     list_price = ml["List price"]
-    headers = [count, product_number, main_product_name, weight, list_price]
+    headers = [product_number, main_product_name, count, weight, list_price]
     if names_length > 1:
         for i in range(1, names_length):
             headers.append(ml["Product names"][i])
